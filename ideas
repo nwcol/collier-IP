@@ -1,0 +1,3 @@
+Modelling continous admixture- I think that this could be accomplished relatively easily by just appending a given number of unmixed individuals to the generation list at the beginning of every generation. 
+
+It would be ideal if the program could write a bunch of 'gens' into a file (gens is a list of generation lists)
