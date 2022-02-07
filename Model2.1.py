@@ -184,6 +184,8 @@ def mate(gen_g_minus1, is_gen_1):
 
 def tabulate_parents_gen_0(gen_0):
     '''tabulates parentage for gen g individuals. x is generation number'''
+    
+    ancestries = []
     pops = []
     female_parents = []
     male_parents = []
@@ -192,38 +194,67 @@ def tabulate_parents_gen_0(gen_0):
         ind = gen_0[index]
         pops.append(ind[2])
         if ind[2] == 1:
+            ancestries.append(1)
             female_parents.append(-1)
             male_parents.append(-1)
         elif ind[2] == 2:
-            female_parents.append(-1)
-            male_parents.append(-1)
+            ancestries.append(0)
+            female_parents.append(-2)
+            male_parents.append(-2)
 
     gen_0_parent_table = {'g' : [0] * len(gen_0),
                           'index' : range(len(gen_0)),
+                          'ancestry' : ancestries,
                           'pop' : pops,
-                          'female parent' : female_parents,
+                          'female_parent' : female_parents,
                           'male_parent' : male_parents   }
     gen_0_parent_frame = pd.DataFrame(gen_0_parent_table)
     return(gen_0_parent_frame)
 
 def tabulate_parents(gen_g, gen_g_parents, x):
     '''tabulates parentage for gen g individuals. x is generation number'''
+    
+    ancestries = []
     pops = []
     female_parents = []
     male_parents = []
-
-    for index in range(len(gen_g)):
-        ind = gen_g[index]
-        pops.append(ind[2])
-        parents = gen_g_parents[index]
-        female_parents.append(parents[0])
-        male_parents.append(parents[1])
+    if x == 1:
+        for index in range(len(gen_g)):
+            parents = gen_g_parents[index]
+            female_parent = parents[0]
+            male_parent = parents[1]
+            female_parents.append(female_parent[3])
+            male_parents.append(male_parent[3])
+            ind = gen_g[index]
+            pops.append(ind[2])
+            ancestries.append(ind[1])
+    else:
+        for index in range(len(gen_g)):
+            parents = gen_g_parents[index]
+            female_parent = parents[0]
+            male_parent = parents[1]
+            if female_parent[2] == 1:
+                female_parents.append(-1)
+            elif female_parent[2] == 2:
+                female_parents.append(-2)
+            else:
+                female_parents.append(female_parent[3])
+            if male_parent[2] == 1: 
+                male_parents.append(-1)
+            elif male_parent[2] == 2:
+                male_parents.append(-2)
+            else:
+                male_parents.append(male_parent[3])
+            ind = gen_g[index]
+            pops.append(ind[2])
+            ancestries.append(ind[1])
 
     gen_g_parent_table = {'g' : [x] * len(gen_g),
                           'index' : range(len(gen_g)),
+                          'ancestry' : ancestries,
                           'pop' : pops,
-                          'female parent' : female_parents,
-                            'male_parent' : male_parents   }
+                          'female_parent' : female_parents,
+                          'male_parent' : male_parents   }
     gen_g_parent_frame = pd.DataFrame(gen_g_parent_table)
     return(gen_g_parent_frame)
 
@@ -237,14 +268,11 @@ def generations(g):
     gen_0_parent_frame = tabulate_parents_gen_0(gen_0)
     parent_frame_list.append(gen_0_parent_frame)
     for x in range(1, g + 1):
-        #deletes indivuals to make room for admixture and keep population constant. check to see if this messes things up
-        #del (gen_g_minus1[:N_const])
-        #maybe the culprit for messing stuff up by deleting part of gen_0?
         if x == 1:
             gen_g, gen_g_parents = mate(gen_g_minus1, True)
             gens.append(gen_g)
         else:
-            del(gen_g_minus1[:N_const])
+            del(gen_g_minus1[(N - N_const):])
             gen_g_minus1 = constant_contribution(gen_g_minus1, S1f_const, S1m_const, S2f_const, S2m_const)
             gen_g, gen_g_parents = mate(gen_g_minus1, False)
             gens.append(gen_g)
@@ -252,7 +280,7 @@ def generations(g):
         gen_g_parent_frame = tabulate_parents(gen_g, gen_g_parents, x)
         parent_frame_list.append(gen_g_parent_frame)
         
-        gen_g_minus1 = gen_g 
+        gen_g_minus1 = copy.deepcopy(gen_g)
     
     parent_frames = pd.concat(parent_frame_list)
     return(gens, parent_frames)
@@ -287,19 +315,19 @@ ch1, chh, ch2 = 0, 0, 0
 c21, c2h, c22 = 0, 0, 0
 
 g = 20
-runs = 10
+runs = 1
 
-S1f_init = 100
-S1m_init = 100
-S2f_init = 100
-S2m_init = 100
+S1f_init = 50
+S1m_init = 50
+S2f_init = 50
+S2m_init = 50
 
 N_target = S1f_init + S1m_init + S2f_init + S2m_init
 
-S1f_const = 0
-S1m_const = 0
-S2f_const = 0
-S2m_const = 0
+S1f_const = 20
+S1m_const = 20
+S2f_const = 20
+S2m_const = 20
 
 N_const = S1f_const + S1m_const + S2f_const + S2m_const
     
@@ -310,13 +338,15 @@ Nf = S1f_init + S2f_init
 Nm = S1m_init + S2m_init
 N_const = S1f_const + S1m_const + S2f_const + S2m_const
 
-S1f_fraction = S1f_init/N
-S1m_fraction = S1m_init/N
+S1 = (S1f_const + S1m_const) / N
+S2 = (S2f_const + S2f_const) / N
 
-%store S1f_fraction
-%store S1m_fraction
+%store S1
+%store S2
+
 %store manygens
 %store N
 %store N_const
 %store c11_0
+%store c11
 %store many_parent_frames
