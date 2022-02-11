@@ -97,7 +97,7 @@ def find_probs(gen_g_minus1):
     s2f = S2f/Nf
     
     s1m = S1m/Nm
-    hm = Hm/Nm, 
+    hm = Hm/Nm
     s2m = S2m/Nm
     
     P11 = s1f * s1m + c11
