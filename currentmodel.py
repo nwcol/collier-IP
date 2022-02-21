@@ -561,10 +561,49 @@ trial_1 = Trial(description = 'c11 = c22 = 0',
                c11_0=0, c22_0=0,
                c11=0.02, c1h=-0.04, c12=0.02,
                ch1=-0.04, chh=0.02, ch2=0.02,
-               c21=0.02, c2h=0.02, c22=-0.04)
+               c21=0.02, c2h=0.02, c22=-0.04))
+
+trial_2 = Trial(description = 'c11 = c22 = 0.02',
+               runs=100, g=20, 
+               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
+               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
+               c11_0=0, c22_0=0, 
+               c11=0.02, c1h=0, c12=-0.02,
+               ch1=0, chh=0, ch2=0,
+               c21=-0.02, c2h=-0, c22=0.02)
+
+trial_3 = Trial(description = 'c11 = c22 = -0.04',
+               runs=100, g=20, 
+               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
+               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
+               c11_0=0, c22_0=0, 
+               c11=-0.04, c1h=0, c12=0.04,
+               ch1=0, chh=0, ch2=0,
+               c21=0.04, c2h=0, c22=-0.04)
+
+trial_4 = Trial(description = 'c11 = c22 = -0.02', 
+               runs=100, g=20, 
+               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
+               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
+               c11_0=0, c22_0=0,
+               c11=-0.02, c1h=0, c12=0.02,
+               ch1=0, chh=0, ch2=0,
+               c21=0.02, c2h=0, c22=-0.02)
+                
+trial_5 = Trial(description = 'c11 = c22 = 0.04', 
+               runs=100, g=20, 
+               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
+               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
+               c11_0=0, c22_0=0,
+               c11=0.04, c1h=0, c12=-0.04,
+               ch1=0, chh=0, ch2=0,
+               c21=-0.04, c2h=0, c22=0.04)
 
 trial_1.execute_trial()
-
+trial_2.execute_trial()
+trial_3.execute_trial()
+trial_4.execute_trial()
+trial_5.execute_trial()
 
 #trial_1.write_parent_frame(0)
 
@@ -573,8 +612,15 @@ varx = varfig.add_subplot(111)
 varx.set(xlabel = 'generations', ylabel = 'variance of S1 ancestry',
               title = 'Variance in Ancestry')
 trial_1.var_plot()
-
-varx.legend([trial_1.description])
+trial_2.var_plot()
+trial_3.var_plot()
+trial_4.var_plot()
+trial_5.var_plot()
+varx.legend([trial_1.description, trial_2.description, trial_3.description, trial_4.description, trial_5.description])
 
 
 trial_1.compare_predicted_var()
+trial_2.compare_predicted_var()
+trial_3.compare_predicted_var()
+trial_4.compare_predicted_var()
+trial_5.compare_predicted_var()
