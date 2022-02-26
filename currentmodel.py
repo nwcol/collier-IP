@@ -4,7 +4,8 @@ import random
 import pandas as pd
 import copy
 
-class Trial:
+class Model:
+    
     
     def __init__(self, description, runs, g, S1f_init, S1m_init, S2f_init, S2m_init, 
                 S1f_const, S1m_const, S2f_const, S2m_const,
@@ -59,6 +60,8 @@ class Trial:
         self.N_f_init = self.S1f_init + self.S2f_init
         self.N_m_init = self.S1m_init + self.S2m_init
         
+        self.id_shift = 0
+        
         
     def new_population(self):
         '''generates an initial generation 0 based on initial parameters'''
@@ -78,6 +81,8 @@ class Trial:
 
         for x in range(len(gen_0)):
             gen_0[x].append(x)
+            
+        self.id_shift = len(gen_0)
             
         return(gen_0)
     
@@ -293,15 +298,16 @@ class Trial:
                 gen_g_parents.append([female_parent, male_parent])
                 offspring = [random.randint(0, 1), (female_parent[1] + male_parent[1]) / 2, 0]
                 gen_g.append(offspring) 
-                
-        start_id = self.N_init * g
+        
         for x in range(len(gen_g)):
-            gen_g[x].append(start_id + x)
+            gen_g[x].append(self.id_shift + x)
+        
+        self.id_shift = self.id_shift + len(gen_g)
 
         return(gen_g, gen_g_parents)
     
 
-    def tabulate_parents_gen_0(self, gen_0):
+    def tabulate_pedigree_gen_0(self, gen_0):
         '''tabulates parentage for gen 0 individuals. all parents in gen 0 are -1 or -2'''
 
         ids = []
@@ -326,18 +332,18 @@ class Trial:
                 female_parents.append(-2)
                 male_parents.append(-2)
 
-        gen_0_parent_table = {'g' : [0] * len(gen_0),
+        gen_0_pedigree_table = {'g' : [0] * len(gen_0),
                               'id' : range(len(gen_0)),
                               'ancestry' : ancestries,
                               'pop' : pops,
                               'female_parent' : female_parents,
                               'male_parent' : male_parents   }
-        gen_0_parent_frame = pd.DataFrame(gen_0_parent_table)
+        gen_0_pedigree_df = pd.DataFrame(gen_0_pedigree_table)
 
-        return(gen_0_parent_frame)
+        return(gen_0_pedigree_df)
     
 
-    def tabulate_parents(self, gen_g, gen_g_parents, x):
+    def tabulate_pedigree(self, gen_g, gen_g_parents, x):
         '''tabulates parentage for gen g individuals. x is generation number'''
 
         ids = []
@@ -345,43 +351,157 @@ class Trial:
         pops = []
         female_parents = []
         male_parents = []
+        
+        migrant_ids = []
+        migrant_ancestries = []
+        migrant_pops = []
+        female_migrant_parents = []
+        male_migrant_parents = []
+        
+        start_id = self.id_shift
+        
+        gen_g_length = len(gen_g)
+        
+        if x == 1:
+            
+            for index in range(len(gen_g)):
 
-        for index in range(len(gen_g)):
+                parents = gen_g_parents[index]
+                female_parent = parents[0]
+                male_parent = parents[1]
 
-            parents = gen_g_parents[index]
-            female_parent = parents[0]
-            male_parent = parents[1]
+                female_parents.append(female_parent[3]) 
+                male_parents.append(male_parent[3])
 
-            female_parents.append(female_parent[3]) 
-            male_parents.append(male_parent[3])
+                ind = gen_g[index]
+                pops.append(ind[2])
+                ancestries.append(ind[1])
+                ids.append(ind[3])
+                
+            migrant_length = 0
+        
+        elif x > 1:
 
-            ind = gen_g[index]
-            pops.append(ind[2])
-            ancestries.append(ind[1])
-            ids.append(ind[3])
+            for index in range(len(gen_g)):
 
-        gen_g_parent_table = {'g' : [x] * len(gen_g),
+                parents = gen_g_parents[index]
+                female_parent = parents[0]
+                male_parent = parents[1]
+
+                ind = gen_g[index]
+                pops.append(ind[2])
+                ancestries.append(ind[1])
+                ids.append(ind[3])
+
+                if female_parent[2] != 0:
+
+                    if female_parent[2] == 1:
+
+                        migrant_ids.append(self.id_shift - gen_g_length)
+                        migrant_ancestries.append(1)
+                        migrant_pops.append(1)
+                        female_migrant_parents.append(-1)
+                        male_migrant_parents.append(-1)
+
+                        self.id_shift = self.id_shift + 1
+
+                        female_parents.append(migrant_ids[-1])
+
+                    elif female_parent[2] == 2:
+
+                        migrant_ids.append(self.id_shift - gen_g_length)
+                        migrant_ancestries.append(0)
+                        migrant_pops.append(2)
+                        female_migrant_parents.append(-2)
+                        male_migrant_parents.append(-2)
+
+                        self.id_shift = self.id_shift + 1
+
+                        female_parents.append(migrant_ids[-1])
+
+                elif female_parent[2] == 0:
+
+                    female_parents.append(female_parent[3])
+
+                if male_parent[2] != 0:
+
+                    if male_parent[2] == 1:
+
+                        migrant_ids.append(self.id_shift - gen_g_length)
+                        migrant_ancestries.append(1)
+                        migrant_pops.append(1)
+                        female_migrant_parents.append(-1)
+                        male_migrant_parents.append(-1)
+
+                        self.id_shift = self.id_shift + 1
+
+                        male_parents.append(migrant_ids[-1])
+
+                    elif male_parent[2] == 2:
+
+                        migrant_ids.append(self.id_shift - gen_g_length)
+                        migrant_ancestries.append(0)
+                        migrant_pops.append(2)
+                        female_migrant_parents.append(-2)
+                        male_migrant_parents.append(-2)
+
+                        self.id_shift = self.id_shift + 1
+
+                        male_parents.append(migrant_ids[-1])
+
+                elif male_parent[2] == 0:
+
+                    male_parents.append(male_parent[3])
+
+
+                migrant_length = len(migrant_ids)
+        
+        for z in range(len(ids)):
+
+            ids[z] = ids[z] + migrant_length
+            
+
+        migrant_pedigree_table = {'g' : [x - 1] * migrant_length,
+                               'id' : migrant_ids,
+                               'ancestry' : migrant_ancestries,
+                               'pop' : migrant_pops,
+                               'female_parent' : female_migrant_parents,
+                               'male_parent' : male_migrant_parents   }
+
+        gen_g_pedigree_table = {'g' : [x] * len(gen_g),
                               'id' : ids,
                               'ancestry' : ancestries,
                               'pop' : pops,
                               'female_parent' : female_parents,
                               'male_parent' : male_parents   }
-        gen_g_parent_frame = pd.DataFrame(gen_g_parent_table)
+        
+        gen_g_migrant_df = pd.DataFrame(migrant_pedigree_table)
+        gen_g_pedigree_df_base = pd.DataFrame(gen_g_pedigree_table)
+        
+        gen_g_pedigree_df = pd.concat([gen_g_migrant_df, gen_g_pedigree_df_base])
+        
+        gen_g_pedigree_df = gen_g_pedigree_df.astype({
+            'g': 'int',
+            'id': 'int',
+            'pop': 'int',
+            'female_parent': 'int',
+            'male_parent': 'int'
+        })
 
-        return(gen_g_parent_frame)
+        return(gen_g_pedigree_df)
     
 
     def make_gens(self):
         '''produces a list of generations'''
         
         gens = []
-        parent_frame_list = []
+        internal_pedigree_list = []
 
         gen_0 = self.new_population()
         gens.append(gen_0) 
         gen_g_minus1 = copy.deepcopy(gen_0)
-        gen_0_parent_frame = self.tabulate_parents_gen_0(gen_0)
-        parent_frame_list.append(gen_0_parent_frame)
+        gen_0_pedigree_df = self.tabulate_pedigree_gen_0(gen_0)
+        internal_pedigree_list.append(gen_0_pedigree_df)
 
         for x in range(1, self.g + 1):
 
@@ -395,37 +515,37 @@ class Trial:
                 gen_g, gen_g_parents = self.mate(gen_g_minus1, False, x)
                 gens.append(gen_g)
 
-            gen_g_parent_frame = self.tabulate_parents(gen_g, gen_g_parents, x)
-            parent_frame_list.append(gen_g_parent_frame)
+            gen_g_pedigree_df = self.tabulate_pedigree(gen_g, gen_g_parents, x)
+            internal_pedigree_list.append(gen_g_pedigree_df)
 
             gen_g_minus1 = copy.deepcopy(gen_g)
 
-        parent_frames = pd.concat(parent_frame_list)
+        pedigree_df = pd.concat(internal_pedigree_list)
 
-        return(gens, parent_frames)
+        return(gens, pedigree_df)
     
 
-    def execute_trial(self):
+    def execute_model(self):
 
-        many_gens = []
-        parent_frame_list = []
+        gens_list = []
+        pedigree_df_list = []
 
         for x in range(self.runs):
-            gens, parent_frames = self.make_gens()
-            many_gens.append(gens)
-            parent_frame_list.append(parent_frames)
+            gens, pedigree_df = self.make_gens()
+            gens_list.append(gens)
+            pedigree_df_list.append(pedigree_df)
         
-        self.many_gens = many_gens
-        self.parent_frame_list = parent_frame_list
+        self.gens_list = gens_list
+        self.pedigree_df_list = pedigree_df_list
         
         
     def var_plot(self):
         
         var = []
-        testgens = self.many_gens[0]
+        testgens = self.gens_list[0]
         for x in range(len(testgens)):
             gen_x_ancestries = []
-            for gens in self.many_gens:
+            for gens in self.gens_list:
                 current_gen = gens[x]
                 for ind in current_gen:
                     gen_x_ancestries.append(ind[1])
@@ -445,7 +565,7 @@ class Trial:
     def histogram(self):
         fig, ax = plt.subplots(self.g, 1, figsize = (5.9, 7 * self.g))
 
-        gens = self.many_gens[0]
+        gens = self.gens_list[0]
         for x in range(0, self.g):
             ancestries = []
             for y in gens[x]:
@@ -462,10 +582,10 @@ class Trial:
     def compare_predicted_var(self):
         
         var = []
-        testgens = self.many_gens[0]
+        testgens = self.gens_list[0]
         for x in range(len(testgens)):  
             gen_x_ancestries = []
-            for gens in self.many_gens:
+            for gens in self.gens_list:
                 current_gen = gens[x]
                 for ind in current_gen:
                     gen_x_ancestries.append(ind[1])    
@@ -548,79 +668,32 @@ class Trial:
         
             
     
-    def write_parent_frame(self, frame_index):
-        selected_frame = self.parent_frame_list[frame_index]
-        selected_frame.to_csv("written_parent_frame.csv") 
+    def write_pedigree_df(self, df_index, output_filename):
         
+        selected_df = self.pedigree_df_list[df_index]
+        selected_df.to_csv(output_filename) 
+        
+    
+    def write_pedigree_df_list(self, output_filename):
+        
+        ###under construction
+        
+        output_file = open(output_filename, 'w')
+
+        for pedigree_df in self.pedigree_df_list:
+            pedigree_df.to_csv(output_filename)
+            
+            
         
 
-trial_1 = Trial(description = 'c11 = c22 = 0', 
-               runs=100, g=20, 
-               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
-               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
+model_1 = Model(description = 'c11 = c22 = 0', 
+               runs=5, g=5, 
+               S1f_init=2, S1m_init=2, S2f_init=2, S2m_init=2, 
+               S1f_const=0, S1m_const=0, S2f_const=0, S2m_const=0,
                c11_0=0, c22_0=0,
-               c11=0.02, c1h=-0.04, c12=0.02,
-               ch1=-0.04, chh=0.02, ch2=0.02,
-               c21=0.02, c2h=0.02, c22=-0.04))
-
-trial_2 = Trial(description = 'c11 = c22 = 0.02',
-               runs=100, g=20, 
-               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
-               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
-               c11_0=0, c22_0=0, 
-               c11=0.02, c1h=0, c12=-0.02,
+               c11=0, c1h=0, c12=0,
                ch1=0, chh=0, ch2=0,
-               c21=-0.02, c2h=-0, c22=0.02)
+               c21=0, c2h=0, c22=0)
 
-trial_3 = Trial(description = 'c11 = c22 = -0.04',
-               runs=100, g=20, 
-               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
-               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
-               c11_0=0, c22_0=0, 
-               c11=-0.04, c1h=0, c12=0.04,
-               ch1=0, chh=0, ch2=0,
-               c21=0.04, c2h=0, c22=-0.04)
-
-trial_4 = Trial(description = 'c11 = c22 = -0.02', 
-               runs=100, g=20, 
-               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
-               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
-               c11_0=0, c22_0=0,
-               c11=-0.02, c1h=0, c12=0.02,
-               ch1=0, chh=0, ch2=0,
-               c21=0.02, c2h=0, c22=-0.02)
-                
-trial_5 = Trial(description = 'c11 = c22 = 0.04', 
-               runs=100, g=20, 
-               S1f_init=500, S1m_init=500, S2f_init=500, S2m_init=500, 
-               S1f_const=200, S1m_const=200, S2f_const=200, S2m_const=200,
-               c11_0=0, c22_0=0,
-               c11=0.04, c1h=0, c12=-0.04,
-               ch1=0, chh=0, ch2=0,
-               c21=-0.04, c2h=0, c22=0.04)
-
-trial_1.execute_trial()
-trial_2.execute_trial()
-trial_3.execute_trial()
-trial_4.execute_trial()
-trial_5.execute_trial()
-
-#trial_1.write_parent_frame(0)
-
-varfig = plt.figure()
-varx = varfig.add_subplot(111)
-varx.set(xlabel = 'generations', ylabel = 'variance of S1 ancestry',
-              title = 'Variance in Ancestry')
-trial_1.var_plot()
-trial_2.var_plot()
-trial_3.var_plot()
-trial_4.var_plot()
-trial_5.var_plot()
-varx.legend([trial_1.description, trial_2.description, trial_3.description, trial_4.description, trial_5.description])
-
-
-trial_1.compare_predicted_var()
-trial_2.compare_predicted_var()
-trial_3.compare_predicted_var()
-trial_4.compare_predicted_var()
-trial_5.compare_predicted_var()
+model_1.execute_model()
+model_1.write_pedigree_df_list(output_filename = "test of write pedigree_df_list.csv")
