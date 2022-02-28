@@ -19,11 +19,11 @@ class Sim:
         self.input_filename = input_filename
         self.seq_length = seq_length
         self.recomb_rate = recomb_rate
-
+        
 
     def execute_sim(self):
 
-        pedigree_df = pandas.read_csv(self.input_filename)
+        pedigree_df = pd.read_csv(self.input_filename)
         max_gen = pedigree_df.iloc[len(pedigree_df) - 1, 1]
         
         this_pedigree = msprime.PedigreeBuilder()
@@ -58,7 +58,7 @@ class Sim:
                 female_parent = -1
 
             else:
-
+                
                 female_parent = female_parent_id
 
             if male_parent_id == -1:
@@ -104,18 +104,20 @@ class Sim:
     
     def show_tree(self):
     
-            sim_svg = self.sim_ts.draw_svg(
-                y_axis = True,
-                y_ticks = [0, 5, 10, 15, 20, 25, 30]
-            )
-            show(SVG(sim_svg))
+        sim_svg = self.sim_ts.draw_svg(
+            size = (200 * self.seq_length, 400),
+            y_axis = True,
+            y_ticks = [0, 5, 10, 15, 20, 25, 30]
+        )
+        display(SVG(sim_svg))
             
             
-    def extract_genome_list(self):
+    def extract_genome_df_list(self):
         
+        #select all individuals in time 0 and make list of their ids
         sample_inds = []
         sample_nodes = []
-    
+
         for x in range(len(self.sim_ts.tables.nodes)):
 
             if x % 2 == 0:
@@ -137,95 +139,84 @@ class Sim:
                     nodes = [x - 1, x]
                     sample_nodes.append(nodes)
 
-        genome_list = []
+        genome_df_list = []
 
-        for ind in range(len(sample_nodes)):
-            
-            ind_nodes = sample_nodes[ind]
+        #read edges table for gen 0
+        for ind_index in range(len(sample_inds)):
 
-            chroms = []
-            starts = []
-            ends = []
-            sources = []
+            ind_chrom_list = []
+            ind_start_list = []
+            ind_stop_list = []
+            ind_parent_node_list = []
 
-            #search for each chromosome     
-            for chrom in range(2):
+            nodes = sample_nodes[ind_index]
 
-                for row in range(len(self.sim_ts.tables.edges)):
+            for node_index in range(2):
 
-                    selected_row = self.sim_ts.tables.edges[row]
+                node = nodes[node_index]
 
-                    if selected_row.child == ind_nodes[chrom]:
+                for row in self.sim_ts.tables.edges:
 
-                        chroms.append(chrom)
-                        starts.append(selected_row.left)
-                        ends.append(selected_row.right)
-                        parent_node = selected_row.parent
+                    if row.child == node:
 
-                        source = None
-                        #temporary- to prevent infinite recursion if something breaks
-                        counter = 0
+                        ind_chrom_list.append(node_index)
+                        ind_parent_node_list.append(row.parent)
+                        ind_start_list.append(row.left)
+                        ind_stop_list.append(row.right)
 
-                        while source == None and counter <20:
+            #iterate through the parents list and find genome sources for each parent
+            ind_source_list = []
 
-                            counter = counter + 1
+            for parent_node in ind_parent_node_list:
 
-                            child_node = parent_node
+                parent_pop = 0
 
-                            for y in range(len(self.sim_ts.tables.edges)):
+                while parent_pop == 0:
 
-                                selected_row = self.sim_ts.tables.edges[y]
+                    parent_id = parent_node // 2
+                    parent_pop = int(self.sim_ts.tables.individuals[parent_id].metadata['$comment'])
 
-                                if selected_row.child == child_node:
+                    if parent_pop != 0:
 
-                                    parent_node = selected_row.parent
+                        ind_source_list.append(parent_pop)
 
-                            selected_row = self.sim_ts.tables.nodes[parent_node]
-                            selected_ind = selected_row.individual
-                            selected_row = self.sim_ts.tables.individuals[selected_ind]
-                            selected_parents = selected_row.parents
+                    else:
 
-                            if selected_parents[0] == -1:
+                        child_node = parent_node
 
-                                source_id = self.sim_ts.tables.nodes[parent_node].individual
-                                source_metadata = self.sim_ts.tables.individuals[source_id].metadata
-                                source = int(source_metadata['$comment'])
-                                sources.append(source)
+                        for row in self.sim_ts.tables.edges:
 
-                            else:
+                            if row.child == child_node:
 
-                                pass
+                                parent_node = row.parent
 
-                        source = None
-                        
-            ind_id = [sample_nodes[ind]] * len(chroms)
-
-            ind_genome = {"chromosome": chroms,
-                          "start": starts,
-                          "end": ends,
-                          "source": sources,
-                          "id": ind_id
+            ind_genome = {"id": [sample_inds[ind_index]] * len(ind_chrom_list),
+                          "chromosome": ind_chrom_list,
+                          "starts": ind_start_list,
+                          "stops": ind_stop_list,
+                          "source": ind_source_list        
                         }
 
             ind_genome_df = pd.DataFrame(ind_genome)
-            ind_genome_df = ind_genome_df.sort_values(by = ["chromosome", "start"])
-            genome_list.append(ind_genome_df)
-        
-        self.genome_list = genome_list
+            ind_genome_df = ind_genome_df.sort_values(by = ["chromosome", "starts"])
+            genome_df_list.append(ind_genome_df)
+
+        self.genome_df_list = genome_df_list
 
     
-    def vis_genome_list(self):
+    def vis_genome_df_list(self):
 
-        figure, ax = plt.subplots(figsize = (10, 0.25 * len(self.genome_list)))
-        ax.set_ylim(0, len(self.genome_list))
+        figure, ax = plt.subplots(figsize = (10, 0.25 * len(self.genome_df_list)))
+        ax.set_ylim(0, len(self.genome_df_list))
+        ax.set_xlim(0, self.seq_length)
         plt.grid(visible = True, axis = 'y', color = 'black', )
 
-        for ind_genome in range(len(self.genome_list)):
+        for ind_genome in range(len(self.genome_df_list)):
 
-            genome_table = self.genome_list[ind_genome]
+            genome_table = self.genome_df_list[ind_genome]
 
-            majtick = np.arange(0, len(self.genome_list), 1)
-            mintick = np.arange(0, len(self.genome_list), 0.5)
+            majtick = np.arange(0, len(self.genome_df_list), 1)
+            mintick = np.arange(0, len(self.genome_df_list), 0.5)
             ax.set_yticks(majtick)
             ax.set_yticks(mintick, minor=True)
 
@@ -238,16 +229,16 @@ class Sim:
 
             for x in range(len(genome_table)):
 
-                chrom_xrange = (genome_table.iloc[x, 1], 
-                                genome_table.iloc[x, 2] - genome_table.iloc[x, 1])
-                source = genome_table.iloc[x, 3]
+                chrom_xrange = (genome_table.iloc[x, 2], 
+                                genome_table.iloc[x, 3] - genome_table.iloc[x, 2])
+                source = genome_table.iloc[x, 4]
 
-                if genome_table.iloc[x, 0] == 0:
+                if genome_table.iloc[x, 1] == 0:
 
                     chrom0_xranges.append(chrom_xrange)
                     chrom0_source.append(source)
 
-                elif genome_table.iloc[x, 0] == 1:
+                elif genome_table.iloc[x, 1] == 1:
 
                     chrom1_xranges.append(chrom_xrange)
                     chrom1_source.append(source)    
@@ -257,22 +248,22 @@ class Sim:
 
                 if x == 1:
 
-                    chrom0_color_list.append("tab:red")
+                    chrom0_color_list.append("r")
 
                 if x == 2:
 
-                    chrom0_color_list.append("tab:blue")
+                    chrom0_color_list.append("b")
 
             chrom1_color_list = []
             for x in chrom1_source:
 
                 if x == 1:
 
-                    chrom1_color_list.append("tab:red")
+                    chrom1_color_list.append("r")
 
                 if x == 2:
 
-                    chrom1_color_list.append("tab:blue")
+                    chrom1_color_list.append("b")
 
 
             ax.broken_barh(chrom0_xranges, 
@@ -284,19 +275,88 @@ class Sim:
                           facecolors = chrom1_color_list)
             
             
-    def write_genome_list(self, 
+    def vis_single_genome(self, genome_index):
+
+        figure, ax = plt.subplots(figsize = (10, 1))
+        ax.set_xlim(0, self.seq_length)
+        ax.set_ylim(0, 1)
+        plt.grid(visible = False)
+        
+        plt.tick_params(left = False, right = False , labelleft = False)
+
+        genome_table = self.genome_df_list[genome_index]
+
+        mintick = np.arange(0, 1, 0.5)
+        ax.set_yticks(mintick, minor=True)
+
+        chrom0_xranges = []
+        chrom1_xranges = []
+        chrom0_source = []
+        chrom1_source = []
+
+        for x in range(len(genome_table)):
+
+            chrom_xrange = (genome_table.iloc[x, 2], 
+                            genome_table.iloc[x, 3] - genome_table.iloc[x, 2])
+            source = genome_table.iloc[x, 4]
+
+            if genome_table.iloc[x, 1] == 0:
+
+                chrom0_xranges.append(chrom_xrange)
+                chrom0_source.append(source)
+
+            elif genome_table.iloc[x, 1] == 1:
+
+                chrom1_xranges.append(chrom_xrange)
+                chrom1_source.append(source)    
+                
+        chrom0_color_list = []
+        for x in chrom0_source:
+
+            if x == 1:
+
+                chrom0_color_list.append("r")
+
+            if x == 2:
+
+                chrom0_color_list.append("b")
+
+        chrom1_color_list = []
+        for x in chrom1_source:
+
+            if x == 1:
+
+                chrom1_color_list.append("r")
+
+            if x == 2:
+
+                chrom1_color_list.append("b")
+
+
+        ax.broken_barh(chrom0_xranges, 
+                        yrange = (0, 0.5),
+                        facecolors = chrom0_color_list)
+
+        ax.broken_barh(chrom1_xranges, 
+                        yrange = (0.5, 1),
+                        facecolors = chrom1_color_list)
+            
+            
+    def write_genome_df_list(self, 
                           output_filename):
 
-        genome_df = pd.concat(self.genome_list)
+        genome_df = pd.concat(self.genome_df_list)
         genome_df.to_csv(output_filename)
-        return(genome_df)
+
                           
 sim1 = Sim(input_filename = "written_parent_frame.csv",
-            seq_length = 10,
+            seq_length = 100,
             recomb_rate = 0.01
          )
 
 sim1.execute_sim()
-sim1.extract_genome_list()
-sim1.vis_genome_list()   
-sim1.write_genome_list(output_filename = "test of genome output.csv")
+#sim1.show_tree()
+sim1.extract_genome_df_list()
+sim1.vis_single_genome(0)
+sim1.vis_genome_df_list()
+sim1.write_sim(output_filename = "test ts output")
