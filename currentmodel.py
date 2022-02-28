@@ -87,8 +87,8 @@ class Model:
         return(gen_0)
     
 
-    def constant_contribution(self, gen_g_minus1):
-        '''appends constant contributions to gen_g_minus1'''
+    def const_mig(self, gen_g_minus1):
+        '''appends constant migrations to gen_g_minus1'''
 
         for x in range(self.S1f_const):
             gen_g_minus1.append([0, 1, 1, -1])
@@ -511,7 +511,7 @@ class Model:
 
             else:
                 del(gen_g_minus1[(self.N_init - self.N_const):])
-                gen_g_minus1 = self.constant_contribution(gen_g_minus1)
+                gen_g_minus1 = self.const_mig(gen_g_minus1)
                 gen_g, gen_g_parents = self.mate(gen_g_minus1, False, x)
                 gens.append(gen_g)
 
@@ -672,23 +672,29 @@ class Model:
         
         selected_df = self.pedigree_df_list[df_index]
         selected_df.to_csv(output_filename) 
+        return("file output successful")
         
     
-    def write_pedigree_df_list(self, output_filename):
+    def write_pedigree_df_list(self, output_filename = None):
         
-        ###under construction
-        
+        if output_filename == None:
+            
+            output_filename = "model df_list N" + str(self.N_init) + " m" + str(self.N_const) + ".csv"
+            output_filename = "modeldata/" + output_filename     
+            
         output_file = open(output_filename, 'w')
 
         for pedigree_df in self.pedigree_df_list:
-            pedigree_df.to_csv(output_filename)
+            pedigree_df.to_csv(output_file)
             
+        output_file.close
+        return("file output successful")
             
         
 
 model_1 = Model(description = 'c11 = c22 = 0', 
-               runs=5, g=5, 
-               S1f_init=2, S1m_init=2, S2f_init=2, S2m_init=2, 
+               runs=1, g=10, 
+               S1f_init=50, S1m_init=50, S2f_init=50, S2m_init=50, 
                S1f_const=0, S1m_const=0, S2f_const=0, S2m_const=0,
                c11_0=0, c22_0=0,
                c11=0, c1h=0, c12=0,
@@ -696,4 +702,4 @@ model_1 = Model(description = 'c11 = c22 = 0',
                c21=0, c2h=0, c22=0)
 
 model_1.execute_model()
-model_1.write_pedigree_df_list(output_filename = "test of write pedigree_df_list.csv")
+model_1.write_pedigree_df(df_index = 0, output_filename = "written_parent_frame.csv")
