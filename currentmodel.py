@@ -1,19 +1,49 @@
 import numpy as np
+import tskit
+import msprime
 import matplotlib.pyplot as plt
 import random
 import pandas as pd
 import copy
+from IPython.display import SVG
 
 class Model:
     
     
-    def __init__(self, description, runs, g, S1f_init, S1m_init, S2f_init, S2m_init, 
-                S1f_const, S1m_const, S2f_const, S2m_const,
-                c11_0, c22_0, 
-                c11, c1h, c12,
-                ch1, chh, ch2,
-                c21, c2h, c22):
-        
+    def __init__(self, 
+                 description = None, 
+                 runs = 1, 
+                 g, 
+                 S1f_init = 0, 
+                 S1m_init = 0, 
+                 S2f_init = 0, 
+                 S2m_init= 0, 
+                 S1f_const = 0, 
+                 S1m_const = 0, 
+                 S2f_const = 0, 
+                 S2m_const = 0,
+                 c11_0 = 0, 
+                 c22_0 = 0, 
+                 c11 = 0, 
+                 c1h = 0, 
+                 c12 = 0,
+                 ch1 = 0, 
+                 chh = 0, 
+                 ch2 = 0,
+                 c21 = 0, 
+                 c2h = 0, 
+                 c22 = 0
+                ):
+        """Initialize the model.
+            arguments
+                description (string) a short description of the parameters of interest (optional)
+                runs (int) the number of trials to perform (optional)
+                g (int) the number of generations to simulate
+                Six_init (int) the initial population by population of origin and sex
+                Six_const (int) the number of migrants per generation by population of origin and sex (optional)
+                cij_0 (float) the assortative constant for the first generation
+                cij (float) the assortative constnat for subsequent generations
+        """
         self.description = description
     
         self.runs = runs
@@ -60,12 +90,9 @@ class Model:
         self.N_f_init = self.S1f_init + self.S2f_init
         self.N_m_init = self.S1m_init + self.S2m_init
         
-        self.id_shift = 0
-        
         
     def new_population(self):
-        '''generates an initial generation 0 based on initial parameters'''
-
+        """generates an initial generation 0 based on initial parameters"""
         gen_0 = []
         for x in range(self.S1f_init):
             gen_0.append([0, 1, 1])
@@ -88,7 +115,7 @@ class Model:
     
 
     def const_mig(self, gen_g_minus1):
-        '''appends constant migrations to gen_g_minus1'''
+        """appends constant migrations to gen_g_minus1"""
 
         for x in range(self.S1f_const):
             gen_g_minus1.append([0, 1, 1, -1])
@@ -106,8 +133,7 @@ class Model:
     
 
     def find_probs_gen1(self, gen_0):
-        '''returns probabilities of matings for gen 1'''
-
+        """returns probabilities of matings for gen 1"""
         S1f, S2f, S1m, S2m = 0, 0, 0, 0
         Nf, Nm = 0, 0
 
@@ -144,8 +170,7 @@ class Model:
     
 
     def find_probs(self, gen_g_minus1):
-        '''returns probabilities of matings based on composition of gen g-1'''
-
+        """returns probabilities of matings based on composition of gen g-1"""
         S1f, Hf, S2f, S1m, Hm, S2m = 0, 0, 0, 0, 0, 0
         Nf, Nm = 0, 0
 
@@ -299,10 +324,9 @@ class Model:
                 offspring = [random.randint(0, 1), (female_parent[1] + male_parent[1]) / 2, 0]
                 gen_g.append(offspring) 
         
+        start_id = self.N_init * g
         for x in range(len(gen_g)):
-            gen_g[x].append(self.id_shift + x)
-        
-        self.id_shift = self.id_shift + len(gen_g)
+            gen_g[x].append(start_id + x)
 
         return(gen_g, gen_g_parents)
     
@@ -351,122 +375,20 @@ class Model:
         pops = []
         female_parents = []
         male_parents = []
-        
-        migrant_ids = []
-        migrant_ancestries = []
-        migrant_pops = []
-        female_migrant_parents = []
-        male_migrant_parents = []
-        
-        start_id = self.id_shift
-        
-        gen_g_length = len(gen_g)
-        
-        if x == 1:
-            
-            for index in range(len(gen_g)):
 
-                parents = gen_g_parents[index]
-                female_parent = parents[0]
-                male_parent = parents[1]
+        for index in range(len(gen_g)):
 
-                female_parents.append(female_parent[3]) 
-                male_parents.append(male_parent[3])
+            parents = gen_g_parents[index]
+            female_parent = parents[0]
+            male_parent = parents[1]
 
-                ind = gen_g[index]
-                pops.append(ind[2])
-                ancestries.append(ind[1])
-                ids.append(ind[3])
-                
-            migrant_length = 0
-        
-        elif x > 1:
+            female_parents.append(female_parent[3]) 
+            male_parents.append(male_parent[3])
 
-            for index in range(len(gen_g)):
-
-                parents = gen_g_parents[index]
-                female_parent = parents[0]
-                male_parent = parents[1]
-
-                ind = gen_g[index]
-                pops.append(ind[2])
-                ancestries.append(ind[1])
-                ids.append(ind[3])
-
-                if female_parent[2] != 0:
-
-                    if female_parent[2] == 1:
-
-                        migrant_ids.append(self.id_shift - gen_g_length)
-                        migrant_ancestries.append(1)
-                        migrant_pops.append(1)
-                        female_migrant_parents.append(-1)
-                        male_migrant_parents.append(-1)
-
-                        self.id_shift = self.id_shift + 1
-
-                        female_parents.append(migrant_ids[-1])
-
-                    elif female_parent[2] == 2:
-
-                        migrant_ids.append(self.id_shift - gen_g_length)
-                        migrant_ancestries.append(0)
-                        migrant_pops.append(2)
-                        female_migrant_parents.append(-2)
-                        male_migrant_parents.append(-2)
-
-                        self.id_shift = self.id_shift + 1
-
-                        female_parents.append(migrant_ids[-1])
-
-                elif female_parent[2] == 0:
-
-                    female_parents.append(female_parent[3])
-
-                if male_parent[2] != 0:
-
-                    if male_parent[2] == 1:
-
-                        migrant_ids.append(self.id_shift - gen_g_length)
-                        migrant_ancestries.append(1)
-                        migrant_pops.append(1)
-                        female_migrant_parents.append(-1)
-                        male_migrant_parents.append(-1)
-
-                        self.id_shift = self.id_shift + 1
-
-                        male_parents.append(migrant_ids[-1])
-
-                    elif male_parent[2] == 2:
-
-                        migrant_ids.append(self.id_shift - gen_g_length)
-                        migrant_ancestries.append(0)
-                        migrant_pops.append(2)
-                        female_migrant_parents.append(-2)
-                        male_migrant_parents.append(-2)
-
-                        self.id_shift = self.id_shift + 1
-
-                        male_parents.append(migrant_ids[-1])
-
-                elif male_parent[2] == 0:
-
-                    male_parents.append(male_parent[3])
-
-
-                migrant_length = len(migrant_ids)
-        
-        for z in range(len(ids)):
-
-            ids[z] = ids[z] + migrant_length
-            
-
-        migrant_pedigree_table = {'g' : [x - 1] * migrant_length,
-                               'id' : migrant_ids,
-                               'ancestry' : migrant_ancestries,
-                               'pop' : migrant_pops,
-                               'female_parent' : female_migrant_parents,
-                               'male_parent' : male_migrant_parents   }
+            ind = gen_g[index]
+            pops.append(ind[2])
+            ancestries.append(ind[1])
+            ids.append(ind[3])
 
         gen_g_pedigree_table = {'g' : [x] * len(gen_g),
                               'id' : ids,
@@ -474,19 +396,7 @@ class Model:
                               'pop' : pops,
                               'female_parent' : female_parents,
                               'male_parent' : male_parents   }
-        
-        gen_g_migrant_df = pd.DataFrame(migrant_pedigree_table)
-        gen_g_pedigree_df_base = pd.DataFrame(gen_g_pedigree_table)
-        
-        gen_g_pedigree_df = pd.concat([gen_g_migrant_df, gen_g_pedigree_df_base])
-        
-        gen_g_pedigree_df = gen_g_pedigree_df.astype({
-            'g': 'int',
-            'id': 'int',
-            'pop': 'int',
-            'female_parent': 'int',
-            'male_parent': 'int'
-        })
+        gen_g_pedigree_df = pd.DataFrame(gen_g_pedigree_table)
 
         return(gen_g_pedigree_df)
     
@@ -521,6 +431,7 @@ class Model:
             gen_g_minus1 = copy.deepcopy(gen_g)
 
         pedigree_df = pd.concat(internal_pedigree_list)
+        pedigree_df = pedigree_df.reset_index(drop = True) 
 
         return(gens, pedigree_df)
     
@@ -563,6 +474,7 @@ class Model:
         
     
     def histogram(self):
+        
         fig, ax = plt.subplots(self.g, 1, figsize = (5.9, 7 * self.g))
 
         gens = self.gens_list[0]
@@ -689,17 +601,367 @@ class Model:
             
         output_file.close
         return("file output successful")
+    
+    
+    def re_index(self, df):
+        '''re-indexes sample_pedigree so that it can be used in msprime'''
+        
+        for row in range(len(df)):
             
+            df.iloc[row, 0] = str(df.iloc[row, 0])
+        
+        for row in range(len(df)):
+            
+            replaced_id = df.iloc[row, 1]
+            df = df.replace(to_replace = replaced_id, value = str(row))
+            
+        return(df)
+    
+    
+    def format_df(self, df):
+        '''corrects variable types for the pedigree df'''
+        
+        df['g'] = pd.to_numeric(df['g'])
+        df['id'] = pd.to_numeric(df['id'])
+        df['pop'] = pd.to_numeric(df['pop'])
+        df['female_parent'] = pd.to_numeric(df['female_parent'])
+        df['male_parent'] = pd.to_numeric(df['male_parent'])
+        
+        return(df)
+    
+    
+    def sample_pedigree_df(self, df_index, sample_size):
+        '''samples a specificed number of individuals from the last generation and trims all individuals which
+            aren't ancestral to them out'''
+        #create the sample list
+        pedigree_df = self.pedigree_df_list[df_index]
+        
+        last_gen_list =[]
+        
+        for row in range(len(pedigree_df)):
+            
+            if pedigree_df.iloc[row, 0] == self.g:
+                
+                last_gen_list.append(pedigree_df.iloc[[row]])
+                
+        sample = random.sample(last_gen_list, sample_size)
+        sample_list = sample
+        
+        for g in range(self.g - 1, -1, -1):
+        
+            sample_parent_ids = []
+            for ind in sample:
+            
+                sample_parent_ids.append(ind.iloc[0, 4])
+                sample_parent_ids.append(ind.iloc[0, 5])
+                
+
+            #remove duplicate parent ids
+            sample_parent_ids = list(set(sample_parent_ids))
+
+            sample_parents = []
+            for parent_id in sample_parent_ids:
+
+                if parent_id > 0:
+
+                    sample_parents.append(pedigree_df.iloc[[parent_id]])
+
+                else:
+                    
+                    pass
+
+            sample_list = sample_list + sample_parents
+            sample = sample_parents
+        
+        sample_df = pd.concat(sample_list)
+        sample_df = sample_df.sort_values(by = ["g", "id"])
+        sample_df = self.re_index(sample_df)
+        sample_df = self.format_df(sample_df)
+        sample_df = sample_df.reset_index(drop = True)
+        
+        self.sample_df = sample_df
+        
+        
+    def write_sample_df(self, output_filename):
+        
+        self.sample_df.to_csv(output_filename) 
+        return("file output successful")
+        
+    
+    def write_sample_df_as_txt(self, output_filename):
+        '''exports the sample df as a string formatted for msprime's pedigree parse function'''
+        
+        sample_df = self.sample_df
+        
+        for row in range(len(self.sample_df)):
+            
+            sample_df.iloc[row, 0] = 5 - sample_df.iloc[row, 0]
+            
+        sample_df.drop('ancestry', inplace = True, axis = 1)
+        sample_df = sample_df.rename(columns={"g": "time", "id":"id", "pop":"location", 
+                                    "female_parent":"parent0", "male_parent":"parent1"})
+        sample_df = sample_df[["id", "location", "parent0", "parent1", "time"]]
+        
+        sample_string = sample_df.to_string(index = False)
+        output_filename = "modeldata/" + output_filename + ".txt"
+        output_file = open(output_filename, "w")
+        output_file.write(sample_string)
+        output_file.close()
+        
+        return("file output successful")
+
+
+class Sim:
+    
+    def __init__(self, 
+                 input_filename, 
+                 seq_length, 
+                 recomb_rate
+                ):
+        """
+            arguments: 
+                input_filename (string) specifies the path and file name from which the pedigree file is loaded
+                seq_length (int) specifies the length of simulated chromosomes in base pairs
+                recomb_rate (float) specifies the chance of recombination between neighboring base pairs       
+        """
+        self.input_filename = input_filename
+        self.seq_length = seq_length
+        self.recomb_rate = recomb_rate
         
 
-model_1 = Model(description = 'c11 = c22 = 0', 
-               runs=1, g=10, 
-               S1f_init=50, S1m_init=50, S2f_init=50, S2m_init=50, 
-               S1f_const=0, S1m_const=0, S2f_const=0, S2m_const=0,
-               c11_0=0, c22_0=0,
-               c11=0, c1h=0, c12=0,
-               ch1=0, chh=0, ch2=0,
-               c21=0, c2h=0, c22=0)
+    def make_pedigree(self):
+        """scans the pedigree table created by model.py and creates a pedigree tree structure.
+        """
+        pedigree_df = pd.read_csv(self.input_filename)
+        max_gen = pedigree_df.iloc[len(pedigree_df) - 1, 1]
+        self.max_gen = max_gen
+        
+        demography = msprime.Demography()
+        demography.add_population(name = "H", initial_size = 0, growth_rate = 0)
+        demography.add_population(name = "S1", initial_size = 0, growth_rate = 0)
+        demography.add_population(name = "S2", initial_size = 0, growth_rate = 0)
+        self.demography = demography
+        
+        this_pedigree = msprime.PedigreeBuilder(demography = self.demography)
+        
+        #individual 0 or nodes 0, 1 is the virtual the progenitor of all S1
+        #indivudal 1 or nodes 2, 3 is the virtual progenitor of all S2
+        this_pedigree.add_individual(
+            time = max_gen + 1, 
+            parents = [-1, -1], 
+            population = "S1"
+        )
+        
+        this_pedigree.add_individual(
+            time = max_gen + 1, 
+            parents = [-1, -1], 
+            population = "S2"
+        )
+        
+        for x in range(len(pedigree_df)):
 
-model_1.execute_model()
-model_1.write_pedigree_df(df_index = 0, output_filename = "written_parent_frame.csv")
+            female_parent_id = pedigree_df.iloc[x, 5] + 2
+            male_parent_id = pedigree_df.iloc[x, 6] + 2
+
+            if female_parent_id == -1:
+
+                female_parent = 0
+
+            elif female_parent_id == -2:
+
+                female_parent = 1
+
+            else:
+                
+                female_parent = female_parent_id
+
+            if male_parent_id == -1:
+
+                male_parent = 0
+
+            elif male_parent_id == -2:
+
+                male_parent = 1
+
+            else:
+
+                male_parent = male_parent_id
+   
+            ind_parents = [female_parent, male_parent]
+            ind_time = max_gen - pedigree_df.iloc[x, 1]
+
+            this_pedigree.add_individual(
+                time = ind_time, 
+                parents = ind_parents, 
+                population = "H"
+            )
+            
+        pedigree_ts = this_pedigree.finalise(sequence_length = self.seq_length)
+        self.pedigree_ts = pedigree_ts
+        
+        return("pedigree successfully created")
+        
+        
+    def make_sim(self):
+        
+        self.make_pedigree()
+    
+        sim_ts = msprime.sim_ancestry(
+            initial_state = self.pedigree_ts,
+            model = 'fixed_pedigree',
+            ploidy = 2,
+            recombination_rate = self.recomb_rate
+        )
+
+        self.sim_ts = sim_ts
+        
+        return("simulation successfully run")    
+
+    
+    def make_root_list(self):
+        
+        root_set = set()
+        for tree_index in range(self.sim_ts.num_trees):
+            
+            tree = self.sim_ts.at_index(tree_index)
+            roots = tree.roots
+            root_set.update(roots)
+            
+        root_list = list(root_set)
+        self.root_list = root_list
+        return(root_list)
+    
+    
+    def make_leaf_list(self):
+        
+        tree = self.sim_ts.first()
+        leaf_list = list(tree.leaves())
+
+        return(leaf_list)
+    
+    
+    def find_root(self, x, locus):
+        
+        tree = self.sim_ts.at(locus)
+        
+        while tree.parent(x) != tskit.NULL:
+            
+            x = tree.parent(x)
+            
+        return(x)
+    
+    
+    def make_squashed_edge(self):
+        """makes the squashed edge table, a compressed tskit edge table 
+            method
+                nodes (rows) whose children are not leaves (in the last generation) are removed
+                nodes whose parents are not roots have their parents replaced by appropriate roots
+                    found using the find_root function
+                parent is replaced with the provenance of the root (1 or 2)
+                table is squashed to merge all adjacent tracts with the same provenance and order 
+                    the table, then returned
+        """
+        edge_table = self.sim_ts.tables.edges
+        leaf_list = self.make_leaf_list()
+        root_list = self.make_root_list()
+        
+        fake_col = tskit.TableCollection()
+        squashed_edge = fake_col.edges
+        
+        for row in edge_table:
+            
+            if row.child in leaf_list:
+    
+                squashed_edge.append(row)
+        
+        for n in range(len(squashed_edge)):
+            
+            row = squashed_edge[n]
+                
+            if row.parent not in root_list:
+                    
+                locus = row.left 
+                root = self.find_root(row.child, locus)
+                squashed_edge[n] = squashed_edge[n].replace(parent = root)
+                
+        for n in range(len(squashed_edge)):
+            
+            prov = self.sim_ts.tables.nodes[squashed_edge[n].parent].population
+            squashed_edge[n] = squashed_edge[n].replace(parent = prov)
+            
+        squashed_edge.squash()
+        
+        self.squashed_edge = squashed_edge
+        return(squashed_edge)
+    
+    
+    def make_genome_df(self):
+        """runs the make_squashed_edge function to create a squashed_edge table and transforms it into
+            a df for export
+        """
+        squashed_edge = self.make_squashed_edge()
+        
+        Id = []
+        Chr = []
+        Start_bp = []
+        End_bp = []
+        Provs = []
+        Start_cM = []
+        End_cM = []
+    
+        for row in squashed_edge:
+        
+            Id.append(row.child // 2)
+            Chr.append(row.child % 2)
+            Start_bp.append(row.left)
+            End_bp.append(row.right)
+            Provs.append(row.parent)
+            Start_cM.append(row.left * self.recomb_rate)
+            End_cM.append(row.right * self.recomb_rate)
+        
+        table = {"Id": Id,
+                 "Chr": Chr,
+                 "Start(bp)": Start_bp,
+                 "End(bp)": End_bp,
+                 "Prov": Provs,
+                 "Start(cM)": Start_cM,
+                 "End(cM)": End_cM}
+        
+        genome_df = pd.DataFrame(table)
+        genome_df = genome_df.sort_values(by = ["Id", "Chr", "Start(bp)"])
+        genome_df = genome_df.reset_index(drop = True)
+        return(genome_df)
+
+    
+    def make_tree_svg(self):
+        """displays an svg tree scaled very roughly based on sequence length
+        """
+        node_labels = {node.id: f"{node.id}" for node in self.sim_ts.nodes()}
+    
+        #{node.individual} before node.id
+    
+        sim_svg = self.sim_ts.draw_svg(
+            size = (200 * self.seq_length, 400),
+            node_labels=node_labels,
+            y_axis = True,
+            y_ticks = [0, 5, 10, 15, 20, 25, 30]
+        )
+        display(SVG(sim_svg))
+
+
+    def make_web(self):
+        """an analytic utility for visualizing lineages using networkx. credit to the msprime manual
+            at https://tskit.dev/msprime/docs/latest/pedigrees.html
+        """
+        G = nx.DiGraph()
+        for ind in self.sim_ts.individuals():
+            time = self.sim_ts.node(ind.nodes[0]).time
+            G.add_node(ind.id, time=time)
+            for p in ind.parents:
+                if p != tskit.NULL:
+                    G.add_edge(ind.id, p)
+        pos = nx.multipartite_layout(G, subset_key="time", align="horizontal")
+        
+        fig, ax = plt.subplots(figsize=(20,20))
+        
+        nx.draw_networkx(G, pos, with_labels=True)
