@@ -7,7 +7,6 @@ import pandas as pd
 import copy
 from IPython.display import SVG
 
-
 class Model:  
     
     def __init__(
